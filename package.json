@@ -1,0 +1,16 @@
+{
+  "name": "bleshell",
+  "private": true,
+  "scripts": {
+    "build": "esbuild src/app.ts --bundle --outfile=dist/app.js --format=iife --global-name=ShellCarPOC --platform=browser",
+    "watch": "npm run build -- --watch"
+  },
+  "devDependencies": {
+    "@types/web-bluetooth": "^0.0.20",
+    "esbuild": "^0.25.0",
+    "typescript": "^5.7.0"
+  },
+  "dependencies": {
+    "aes-js": "^3.1.2"
+  }
+}

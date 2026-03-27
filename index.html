@@ -1,0 +1,159 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Shell Motorsport BLE — Web POC</title>
+    <style>
+      :root {
+        color-scheme: dark;
+        --bg: #0f1419;
+        --panel: #1a222d;
+        --accent: #e85c1a;
+        --text: #e8ecf0;
+        --muted: #8a939c;
+        --btn: #2a3542;
+        --btn-active: #3d4d60;
+      }
+      * {
+        box-sizing: border-box;
+      }
+      body {
+        margin: 0;
+        min-height: 100vh;
+        font-family: system-ui, "Segoe UI", Roboto, sans-serif;
+        background: var(--bg);
+        color: var(--text);
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        padding: 1.25rem;
+      }
+      h1 {
+        font-size: 1.15rem;
+        font-weight: 600;
+        margin: 0 0 0.35rem;
+      }
+      .sub {
+        color: var(--muted);
+        font-size: 0.85rem;
+        margin-bottom: 1.25rem;
+        text-align: center;
+        max-width: 36rem;
+        line-height: 1.45;
+      }
+      .bar {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 0.5rem;
+        align-items: center;
+        justify-content: center;
+        margin-bottom: 1rem;
+      }
+      button {
+        font: inherit;
+        cursor: pointer;
+        border: none;
+        border-radius: 8px;
+        padding: 0.5rem 1rem;
+        background: var(--btn);
+        color: var(--text);
+      }
+      button:hover {
+        background: var(--btn-active);
+      }
+      button.primary {
+        background: var(--accent);
+        color: #111;
+        font-weight: 600;
+      }
+      button.primary:hover {
+        filter: brightness(1.08);
+      }
+      #status {
+        font-size: 0.9rem;
+        color: var(--muted);
+      }
+      .panel {
+        background: var(--panel);
+        border-radius: 12px;
+        padding: 1rem 1.25rem;
+        width: min(100%, 22rem);
+      }
+      .dpad {
+        display: grid;
+        grid-template-columns: 1fr 1fr 1fr;
+        grid-template-rows: auto auto auto;
+        gap: 0.4rem;
+        max-width: 12rem;
+        margin: 0 auto 0.75rem;
+      }
+      .dpad .sp {
+        grid-column: 2;
+      }
+      .dpad button {
+        min-height: 3rem;
+        padding: 0.35rem;
+        font-size: 0.9rem;
+      }
+      .row {
+        display: flex;
+        gap: 0.4rem;
+        justify-content: center;
+        flex-wrap: wrap;
+      }
+      .hint {
+        font-size: 0.78rem;
+        color: var(--muted);
+        margin-top: 1rem;
+        line-height: 1.5;
+      }
+      kbd {
+        background: #0d1117;
+        padding: 0.1rem 0.35rem;
+        border-radius: 4px;
+        font-size: 0.85em;
+      }
+    </style>
+  </head>
+  <body>
+    <h1>Shell Motorsport BLE Controller</h1>
+    <p class="sub">
+      Browser-only POC — pair a QCAR / Brandbase-style car over Web Bluetooth (Chromium, HTTPS or
+      localhost). Protocol matches
+      <a href="https://github.com/luchojuarez/shell-car-remote" style="color: var(--accent)"
+        >shell-car-remote</a
+      >.
+    </p>
+    <div class="bar">
+      <button type="button" class="primary" id="btn-connect">Pair &amp; connect</button>
+      <button type="button" id="btn-disconnect">Disconnect</button>
+      <span id="status">Idle</span>
+    </div>
+    <p style="margin: 0 0 0.75rem; font-size: 0.85rem">
+      Battery: <strong id="battery">—</strong>
+    </p>
+    <div class="panel">
+      <div class="dpad">
+        <span></span>
+        <button type="button" id="btn-fwd">▲</button>
+        <span></span>
+        <button type="button" id="btn-left">◀</button>
+        <button type="button" id="btn-back">▼</button>
+        <button type="button" id="btn-right">▶</button>
+      </div>
+      <div class="row">
+        <button type="button" id="btn-turbo">Turbo</button>
+        <button type="button" id="btn-lights">Lights</button>
+      </div>
+      <p class="hint">
+        <strong>Keyboard:</strong> <kbd>WASD</kbd> / arrows drive, <kbd>Shift</kbd> turbo,
+        <kbd>L</kbd> toggle lights.<br />
+        <strong>Gamepad:</strong> <strong>left stick</strong> or <strong>D-pad</strong> to drive;
+        <strong>L1 / R1</strong> or <strong>RT</strong> &gt; 40% turbo;
+        <strong>Y / △</strong> or <strong>PS</strong> (buttons 16–17) toggles lights.
+      </p>
+    </div>
+    <script src="dist/app.js"></script>
+  </body>
+</html>
