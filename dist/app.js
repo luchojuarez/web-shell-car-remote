@@ -923,6 +923,12 @@ var ShellCarPOC = (() => {
       right: false,
       turbo: false
     };
+    document.addEventListener("contextmenu", (e) => {
+      if (e.target.closest("button")) e.preventDefault();
+    });
+    document.addEventListener("dragstart", (e) => {
+      if (e.target.closest("button")) e.preventDefault();
+    });
     function paintStatus(msg) {
       if (elStatus) elStatus.textContent = msg;
     }

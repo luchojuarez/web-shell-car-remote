@@ -318,6 +318,13 @@ function setupUi(): void {
     turbo: false,
   };
 
+  document.addEventListener("contextmenu", (e) => {
+    if ((e.target as HTMLElement).closest("button")) e.preventDefault();
+  });
+  document.addEventListener("dragstart", (e) => {
+    if ((e.target as HTMLElement).closest("button")) e.preventDefault();
+  });
+
   function paintStatus(msg: string): void {
     if (elStatus) elStatus.textContent = msg;
   }
