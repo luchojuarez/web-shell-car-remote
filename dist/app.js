@@ -864,15 +864,33 @@ var ShellCarPOC = (() => {
   }
   var ORIENT_DEAD_DEG = 18;
   var orientationSteeringEnabled = false;
-  var orientationGammaBaseline = null;
-  var lastOrientGamma = null;
+  var orientationSteerBaseline = null;
+  var lastSteerTiltDeg = null;
+  function getScreenOrientationAngle() {
+    const a = window.screen?.orientation?.angle;
+    if (typeof a === "number" && !Number.isNaN(a)) return a;
+    const legacy = window.orientation;
+    if (typeof legacy === "number" && !Number.isNaN(legacy)) return legacy;
+    return 0;
+  }
+  function steerTiltFromDeviceOrientation(ev) {
+    const beta = ev.beta;
+    const gamma = ev.gamma;
+    if (beta == null || gamma == null) return null;
+    const rad = getScreenOrientationAngle() * Math.PI / 180;
+    return gamma * Math.cos(rad) + beta * Math.sin(rad);
+  }
   function onDeviceOrientation(ev) {
     if (!orientationSteeringEnabled) return;
-    if (ev.gamma == null) return;
-    lastOrientGamma = ev.gamma;
-    if (orientationGammaBaseline == null) {
-      orientationGammaBaseline = ev.gamma;
+    const steer = steerTiltFromDeviceOrientation(ev);
+    if (steer == null) return;
+    lastSteerTiltDeg = steer;
+    if (orientationSteerBaseline == null) {
+      orientationSteerBaseline = steer;
     }
+  }
+  function resetOrientationSteerBaseline() {
+    orientationSteerBaseline = null;
   }
   async function requestDeviceOrientationPermission() {
     const ctor = DeviceOrientationEvent;
@@ -883,12 +901,12 @@ var ShellCarPOC = (() => {
     return true;
   }
   function readOrientationSteer() {
-    if (!orientationSteeringEnabled || orientationGammaBaseline == null) return {};
-    if (lastOrientGamma == null) return {};
-    const dGamma = lastOrientGamma - orientationGammaBaseline;
+    if (!orientationSteeringEnabled || orientationSteerBaseline == null) return {};
+    if (lastSteerTiltDeg == null) return {};
+    const d = lastSteerTiltDeg - orientationSteerBaseline;
     const out = {};
-    if (dGamma < -ORIENT_DEAD_DEG) out.left = true;
-    else if (dGamma > ORIENT_DEAD_DEG) out.right = true;
+    if (d < -ORIENT_DEAD_DEG) out.left = true;
+    else if (d > ORIENT_DEAD_DEG) out.right = true;
     return out;
   }
   function setupUi() {
@@ -940,9 +958,10 @@ var ShellCarPOC = (() => {
     btnTiltSteer?.addEventListener("click", () => {
       if (orientationSteeringEnabled) {
         orientationSteeringEnabled = false;
-        orientationGammaBaseline = null;
-        lastOrientGamma = null;
+        orientationSteerBaseline = null;
+        lastSteerTiltDeg = null;
         window.removeEventListener("deviceorientation", onDeviceOrientation);
+        window.removeEventListener("orientationchange", resetOrientationSteerBaseline);
         setTiltSteerUi(false);
         return;
       }
@@ -954,9 +973,10 @@ var ShellCarPOC = (() => {
             return;
           }
           orientationSteeringEnabled = true;
-          orientationGammaBaseline = null;
-          lastOrientGamma = null;
+          orientationSteerBaseline = null;
+          lastSteerTiltDeg = null;
           window.addEventListener("deviceorientation", onDeviceOrientation, true);
+          window.addEventListener("orientationchange", resetOrientationSteerBaseline);
           setTiltSteerUi(true);
           paintStatus("Tilt steer on \u2014 hold level, then tilt left/right");
         } catch (err) {

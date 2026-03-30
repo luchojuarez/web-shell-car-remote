@@ -238,16 +238,42 @@ function mergeInputs(
 const ORIENT_DEAD_DEG = 18;
 
 let orientationSteeringEnabled = false;
-let orientationGammaBaseline: number | null = null;
-let lastOrientGamma: number | null = null;
+let orientationSteerBaseline: number | null = null;
+let lastSteerTiltDeg: number | null = null;
+
+function getScreenOrientationAngle(): number {
+  const a = window.screen?.orientation?.angle;
+  if (typeof a === "number" && !Number.isNaN(a)) return a;
+  const legacy = (window as Window & { orientation?: number }).orientation;
+  if (typeof legacy === "number" && !Number.isNaN(legacy)) return legacy;
+  return 0;
+}
+
+/**
+ * Tilt in the screen’s horizontal plane (left/right steering), not raw gamma.
+ * In portrait, gamma is mostly roll; in landscape, that motion often appears on beta — see
+ * [deviceorientation](https://developer.mozilla.org/en-US/docs/Web/API/Window/deviceorientation_event).
+ */
+function steerTiltFromDeviceOrientation(ev: DeviceOrientationEvent): number | null {
+  const beta = ev.beta;
+  const gamma = ev.gamma;
+  if (beta == null || gamma == null) return null;
+  const rad = (getScreenOrientationAngle() * Math.PI) / 180;
+  return gamma * Math.cos(rad) + beta * Math.sin(rad);
+}
 
 function onDeviceOrientation(ev: DeviceOrientationEvent): void {
   if (!orientationSteeringEnabled) return;
-  if (ev.gamma == null) return;
-  lastOrientGamma = ev.gamma;
-  if (orientationGammaBaseline == null) {
-    orientationGammaBaseline = ev.gamma;
+  const steer = steerTiltFromDeviceOrientation(ev);
+  if (steer == null) return;
+  lastSteerTiltDeg = steer;
+  if (orientationSteerBaseline == null) {
+    orientationSteerBaseline = steer;
   }
+}
+
+function resetOrientationSteerBaseline(): void {
+  orientationSteerBaseline = null;
 }
 
 async function requestDeviceOrientationPermission(): Promise<boolean> {
@@ -262,17 +288,17 @@ async function requestDeviceOrientationPermission(): Promise<boolean> {
 }
 
 /**
- * Maps [deviceorientation](https://developer.mozilla.org/en-US/docs/Web/API/Window/deviceorientation_event)
- * gamma (left/right tilt) to steer bits, relative to baseline on first reading after enable.
+ * Maps combined screen-horizontal tilt to steer bits, relative to baseline after enable
+ * (or after a screen rotation).
  */
 function readOrientationSteer(): Partial<DriveInputs> {
-  if (!orientationSteeringEnabled || orientationGammaBaseline == null) return {};
-  if (lastOrientGamma == null) return {};
+  if (!orientationSteeringEnabled || orientationSteerBaseline == null) return {};
+  if (lastSteerTiltDeg == null) return {};
 
-  const dGamma = lastOrientGamma - orientationGammaBaseline;
+  const d = lastSteerTiltDeg - orientationSteerBaseline;
   const out: Partial<DriveInputs> = {};
-  if (dGamma < -ORIENT_DEAD_DEG) out.left = true;
-  else if (dGamma > ORIENT_DEAD_DEG) out.right = true;
+  if (d < -ORIENT_DEAD_DEG) out.left = true;
+  else if (d > ORIENT_DEAD_DEG) out.right = true;
   return out;
 }
 
@@ -335,9 +361,10 @@ function setupUi(): void {
   btnTiltSteer?.addEventListener("click", () => {
     if (orientationSteeringEnabled) {
       orientationSteeringEnabled = false;
-      orientationGammaBaseline = null;
-      lastOrientGamma = null;
+      orientationSteerBaseline = null;
+      lastSteerTiltDeg = null;
       window.removeEventListener("deviceorientation", onDeviceOrientation);
+      window.removeEventListener("orientationchange", resetOrientationSteerBaseline);
       setTiltSteerUi(false);
       return;
     }
@@ -350,9 +377,10 @@ function setupUi(): void {
           return;
         }
         orientationSteeringEnabled = true;
-        orientationGammaBaseline = null;
-        lastOrientGamma = null;
+        orientationSteerBaseline = null;
+        lastSteerTiltDeg = null;
         window.addEventListener("deviceorientation", onDeviceOrientation, true);
+        window.addEventListener("orientationchange", resetOrientationSteerBaseline);
         setTiltSteerUi(true);
         paintStatus("Tilt steer on — hold level, then tilt left/right");
       } catch (err) {
