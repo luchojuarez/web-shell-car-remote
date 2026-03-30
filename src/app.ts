@@ -237,20 +237,16 @@ function mergeInputs(
 /** Degrees — same idea as gamepad dead zone (see readGamepadAxes). */
 const ORIENT_DEAD_DEG = 18;
 
-type OrientationBaseline = { beta: number; gamma: number };
-
 let orientationSteeringEnabled = false;
-let orientationBaseline: OrientationBaseline | null = null;
-let lastOrientBeta: number | null = null;
+let orientationGammaBaseline: number | null = null;
 let lastOrientGamma: number | null = null;
 
 function onDeviceOrientation(ev: DeviceOrientationEvent): void {
   if (!orientationSteeringEnabled) return;
-  if (ev.beta == null || ev.gamma == null) return;
-  lastOrientBeta = ev.beta;
+  if (ev.gamma == null) return;
   lastOrientGamma = ev.gamma;
-  if (!orientationBaseline) {
-    orientationBaseline = { beta: ev.beta, gamma: ev.gamma };
+  if (orientationGammaBaseline == null) {
+    orientationGammaBaseline = ev.gamma;
   }
 }
 
@@ -267,22 +263,16 @@ async function requestDeviceOrientationPermission(): Promise<boolean> {
 
 /**
  * Maps [deviceorientation](https://developer.mozilla.org/en-US/docs/Web/API/Window/deviceorientation_event)
- * beta/gamma to drive bits, relative to the baseline captured on the first reading after enable.
+ * gamma (left/right tilt) to steer bits, relative to baseline on first reading after enable.
  */
 function readOrientationSteer(): Partial<DriveInputs> {
-  if (!orientationSteeringEnabled || !orientationBaseline) return {};
-  if (lastOrientBeta == null || lastOrientGamma == null) return {};
+  if (!orientationSteeringEnabled || orientationGammaBaseline == null) return {};
+  if (lastOrientGamma == null) return {};
 
-  const dBeta = lastOrientBeta - orientationBaseline.beta;
-  const dGamma = lastOrientGamma - orientationBaseline.gamma;
-
+  const dGamma = lastOrientGamma - orientationGammaBaseline;
   const out: Partial<DriveInputs> = {};
   if (dGamma < -ORIENT_DEAD_DEG) out.left = true;
   else if (dGamma > ORIENT_DEAD_DEG) out.right = true;
-
-  if (dBeta < -ORIENT_DEAD_DEG) out.forward = true;
-  else if (dBeta > ORIENT_DEAD_DEG) out.backward = true;
-
   return out;
 }
 
@@ -345,8 +335,7 @@ function setupUi(): void {
   btnTiltSteer?.addEventListener("click", () => {
     if (orientationSteeringEnabled) {
       orientationSteeringEnabled = false;
-      orientationBaseline = null;
-      lastOrientBeta = null;
+      orientationGammaBaseline = null;
       lastOrientGamma = null;
       window.removeEventListener("deviceorientation", onDeviceOrientation);
       setTiltSteerUi(false);
@@ -361,12 +350,11 @@ function setupUi(): void {
           return;
         }
         orientationSteeringEnabled = true;
-        orientationBaseline = null;
-        lastOrientBeta = null;
+        orientationGammaBaseline = null;
         lastOrientGamma = null;
         window.addEventListener("deviceorientation", onDeviceOrientation, true);
         setTiltSteerUi(true);
-        paintStatus("Tilt steer on — hold level, then tilt to drive");
+        paintStatus("Tilt steer on — hold level, then tilt left/right");
       } catch (err) {
         paintStatus(
           err instanceof Error ? err.message : "Tilt steer: permission failed",

@@ -864,16 +864,14 @@ var ShellCarPOC = (() => {
   }
   var ORIENT_DEAD_DEG = 18;
   var orientationSteeringEnabled = false;
-  var orientationBaseline = null;
-  var lastOrientBeta = null;
+  var orientationGammaBaseline = null;
   var lastOrientGamma = null;
   function onDeviceOrientation(ev) {
     if (!orientationSteeringEnabled) return;
-    if (ev.beta == null || ev.gamma == null) return;
-    lastOrientBeta = ev.beta;
+    if (ev.gamma == null) return;
     lastOrientGamma = ev.gamma;
-    if (!orientationBaseline) {
-      orientationBaseline = { beta: ev.beta, gamma: ev.gamma };
+    if (orientationGammaBaseline == null) {
+      orientationGammaBaseline = ev.gamma;
     }
   }
   async function requestDeviceOrientationPermission() {
@@ -885,15 +883,12 @@ var ShellCarPOC = (() => {
     return true;
   }
   function readOrientationSteer() {
-    if (!orientationSteeringEnabled || !orientationBaseline) return {};
-    if (lastOrientBeta == null || lastOrientGamma == null) return {};
-    const dBeta = lastOrientBeta - orientationBaseline.beta;
-    const dGamma = lastOrientGamma - orientationBaseline.gamma;
+    if (!orientationSteeringEnabled || orientationGammaBaseline == null) return {};
+    if (lastOrientGamma == null) return {};
+    const dGamma = lastOrientGamma - orientationGammaBaseline;
     const out = {};
     if (dGamma < -ORIENT_DEAD_DEG) out.left = true;
     else if (dGamma > ORIENT_DEAD_DEG) out.right = true;
-    if (dBeta < -ORIENT_DEAD_DEG) out.forward = true;
-    else if (dBeta > ORIENT_DEAD_DEG) out.backward = true;
     return out;
   }
   function setupUi() {
@@ -945,8 +940,7 @@ var ShellCarPOC = (() => {
     btnTiltSteer?.addEventListener("click", () => {
       if (orientationSteeringEnabled) {
         orientationSteeringEnabled = false;
-        orientationBaseline = null;
-        lastOrientBeta = null;
+        orientationGammaBaseline = null;
         lastOrientGamma = null;
         window.removeEventListener("deviceorientation", onDeviceOrientation);
         setTiltSteerUi(false);
@@ -960,12 +954,11 @@ var ShellCarPOC = (() => {
             return;
           }
           orientationSteeringEnabled = true;
-          orientationBaseline = null;
-          lastOrientBeta = null;
+          orientationGammaBaseline = null;
           lastOrientGamma = null;
           window.addEventListener("deviceorientation", onDeviceOrientation, true);
           setTiltSteerUi(true);
-          paintStatus("Tilt steer on \u2014 hold level, then tilt to drive");
+          paintStatus("Tilt steer on \u2014 hold level, then tilt left/right");
         } catch (err) {
           paintStatus(
             err instanceof Error ? err.message : "Tilt steer: permission failed"
