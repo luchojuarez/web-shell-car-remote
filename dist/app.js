@@ -862,12 +862,47 @@ var ShellCarPOC = (() => {
       turbo: overlay.turbo !== void 0 ? overlay.turbo : base.turbo
     };
   }
+  var ORIENT_DEAD_DEG = 18;
+  var orientationSteeringEnabled = false;
+  var orientationBaseline = null;
+  var lastOrientBeta = null;
+  var lastOrientGamma = null;
+  function onDeviceOrientation(ev) {
+    if (!orientationSteeringEnabled) return;
+    if (ev.beta == null || ev.gamma == null) return;
+    lastOrientBeta = ev.beta;
+    lastOrientGamma = ev.gamma;
+    if (!orientationBaseline) {
+      orientationBaseline = { beta: ev.beta, gamma: ev.gamma };
+    }
+  }
+  async function requestDeviceOrientationPermission() {
+    const ctor = DeviceOrientationEvent;
+    if (typeof ctor.requestPermission === "function") {
+      const r = await ctor.requestPermission();
+      return r === "granted";
+    }
+    return true;
+  }
+  function readOrientationSteer() {
+    if (!orientationSteeringEnabled || !orientationBaseline) return {};
+    if (lastOrientBeta == null || lastOrientGamma == null) return {};
+    const dBeta = lastOrientBeta - orientationBaseline.beta;
+    const dGamma = lastOrientGamma - orientationBaseline.gamma;
+    const out = {};
+    if (dGamma < -ORIENT_DEAD_DEG) out.left = true;
+    else if (dGamma > ORIENT_DEAD_DEG) out.right = true;
+    if (dBeta < -ORIENT_DEAD_DEG) out.forward = true;
+    else if (dBeta > ORIENT_DEAD_DEG) out.backward = true;
+    return out;
+  }
   function setupUi() {
     const elStatus = document.getElementById("status");
     const elBattery = document.getElementById("battery");
     const btnConnect = document.getElementById("btn-connect");
     const btnDisconnect = document.getElementById("btn-disconnect");
     const btnLights = document.getElementById("btn-lights");
+    const btnTiltSteer = document.getElementById("btn-tilt-steer");
     const keys = {
       forward: false,
       backward: false,
@@ -900,6 +935,43 @@ var ShellCarPOC = (() => {
     });
     btnLights?.addEventListener("click", () => {
       toggleLights(plaintext);
+    });
+    function setTiltSteerUi(active) {
+      if (btnTiltSteer) {
+        btnTiltSteer.textContent = active ? "Tilt steer (on)" : "Tilt steer";
+        btnTiltSteer.setAttribute("aria-pressed", active ? "true" : "false");
+      }
+    }
+    btnTiltSteer?.addEventListener("click", () => {
+      if (orientationSteeringEnabled) {
+        orientationSteeringEnabled = false;
+        orientationBaseline = null;
+        lastOrientBeta = null;
+        lastOrientGamma = null;
+        window.removeEventListener("deviceorientation", onDeviceOrientation);
+        setTiltSteerUi(false);
+        return;
+      }
+      void (async () => {
+        try {
+          const ok = await requestDeviceOrientationPermission();
+          if (!ok) {
+            paintStatus("Tilt steer: permission denied");
+            return;
+          }
+          orientationSteeringEnabled = true;
+          orientationBaseline = null;
+          lastOrientBeta = null;
+          lastOrientGamma = null;
+          window.addEventListener("deviceorientation", onDeviceOrientation, true);
+          setTiltSteerUi(true);
+          paintStatus("Tilt steer on \u2014 hold level, then tilt to drive");
+        } catch (err) {
+          paintStatus(
+            err instanceof Error ? err.message : "Tilt steer: permission failed"
+          );
+        }
+      })();
     });
     const hold = (id, down) => {
       keys[id] = down;
@@ -981,7 +1053,7 @@ var ShellCarPOC = (() => {
     let prevGamepadLights = false;
     function tick() {
       const gp = readGamepadAxes();
-      const merged = mergeInputs(keys, gp);
+      const merged = mergeInputs(mergeInputs(keys, gp), readOrientationSteer());
       applyInputsToPlaintext(merged);
       const lightsHeld = readGamepadLightsHeld();
       if (lightsHeld && !prevGamepadLights) {

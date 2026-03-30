@@ -234,12 +234,65 @@ function mergeInputs(
   };
 }
 
+/** Degrees — same idea as gamepad dead zone (see readGamepadAxes). */
+const ORIENT_DEAD_DEG = 18;
+
+type OrientationBaseline = { beta: number; gamma: number };
+
+let orientationSteeringEnabled = false;
+let orientationBaseline: OrientationBaseline | null = null;
+let lastOrientBeta: number | null = null;
+let lastOrientGamma: number | null = null;
+
+function onDeviceOrientation(ev: DeviceOrientationEvent): void {
+  if (!orientationSteeringEnabled) return;
+  if (ev.beta == null || ev.gamma == null) return;
+  lastOrientBeta = ev.beta;
+  lastOrientGamma = ev.gamma;
+  if (!orientationBaseline) {
+    orientationBaseline = { beta: ev.beta, gamma: ev.gamma };
+  }
+}
+
+async function requestDeviceOrientationPermission(): Promise<boolean> {
+  const ctor = DeviceOrientationEvent as unknown as {
+    requestPermission?: () => Promise<"granted" | "denied">;
+  };
+  if (typeof ctor.requestPermission === "function") {
+    const r = await ctor.requestPermission();
+    return r === "granted";
+  }
+  return true;
+}
+
+/**
+ * Maps [deviceorientation](https://developer.mozilla.org/en-US/docs/Web/API/Window/deviceorientation_event)
+ * beta/gamma to drive bits, relative to the baseline captured on the first reading after enable.
+ */
+function readOrientationSteer(): Partial<DriveInputs> {
+  if (!orientationSteeringEnabled || !orientationBaseline) return {};
+  if (lastOrientBeta == null || lastOrientGamma == null) return {};
+
+  const dBeta = lastOrientBeta - orientationBaseline.beta;
+  const dGamma = lastOrientGamma - orientationBaseline.gamma;
+
+  const out: Partial<DriveInputs> = {};
+  if (dGamma < -ORIENT_DEAD_DEG) out.left = true;
+  else if (dGamma > ORIENT_DEAD_DEG) out.right = true;
+
+  if (dBeta < -ORIENT_DEAD_DEG) out.forward = true;
+  else if (dBeta > ORIENT_DEAD_DEG) out.backward = true;
+
+  return out;
+}
+
 function setupUi(): void {
   const elStatus = document.getElementById("status");
   const elBattery = document.getElementById("battery");
   const btnConnect = document.getElementById("btn-connect");
   const btnDisconnect = document.getElementById("btn-disconnect");
   const btnLights = document.getElementById("btn-lights");
+  const btnTiltSteer = document.getElementById("btn-tilt-steer");
 
   const keys: DriveInputs = {
     forward: false,
@@ -280,6 +333,46 @@ function setupUi(): void {
 
   btnLights?.addEventListener("click", () => {
     toggleLights(plaintext);
+  });
+
+  function setTiltSteerUi(active: boolean): void {
+    if (btnTiltSteer) {
+      btnTiltSteer.textContent = active ? "Tilt steer (on)" : "Tilt steer";
+      btnTiltSteer.setAttribute("aria-pressed", active ? "true" : "false");
+    }
+  }
+
+  btnTiltSteer?.addEventListener("click", () => {
+    if (orientationSteeringEnabled) {
+      orientationSteeringEnabled = false;
+      orientationBaseline = null;
+      lastOrientBeta = null;
+      lastOrientGamma = null;
+      window.removeEventListener("deviceorientation", onDeviceOrientation);
+      setTiltSteerUi(false);
+      return;
+    }
+
+    void (async () => {
+      try {
+        const ok = await requestDeviceOrientationPermission();
+        if (!ok) {
+          paintStatus("Tilt steer: permission denied");
+          return;
+        }
+        orientationSteeringEnabled = true;
+        orientationBaseline = null;
+        lastOrientBeta = null;
+        lastOrientGamma = null;
+        window.addEventListener("deviceorientation", onDeviceOrientation, true);
+        setTiltSteerUi(true);
+        paintStatus("Tilt steer on — hold level, then tilt to drive");
+      } catch (err) {
+        paintStatus(
+          err instanceof Error ? err.message : "Tilt steer: permission failed",
+        );
+      }
+    })();
   });
 
   const hold = (id: keyof DriveInputs, down: boolean) => {
@@ -368,7 +461,7 @@ function setupUi(): void {
 
   function tick(): void {
     const gp = readGamepadAxes();
-    const merged = mergeInputs(keys, gp);
+    const merged = mergeInputs(mergeInputs(keys, gp), readOrientationSteer());
     applyInputsToPlaintext(merged);
 
     const lightsHeld = readGamepadLightsHeld();

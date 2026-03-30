@@ -145,13 +145,20 @@
       <div class="row">
         <button type="button" id="btn-turbo">Turbo</button>
         <button type="button" id="btn-lights">Lights</button>
+        <button type="button" id="btn-tilt-steer" aria-pressed="false">
+          Tilt steer
+        </button>
       </div>
       <p class="hint">
         <strong>Keyboard:</strong> <kbd>WASD</kbd> / arrows drive, <kbd>Shift</kbd> turbo,
         <kbd>L</kbd> toggle lights.<br />
         <strong>Gamepad:</strong> <strong>left stick</strong> or <strong>D-pad</strong> to drive;
         <strong>L1 / R1</strong> or <strong>RT</strong> &gt; 40% turbo;
-        <strong>Y / △</strong> or <strong>PS</strong> (buttons 16–17) toggles lights.
+        <strong>Y / △</strong> or <strong>PS</strong> (buttons 16–17) toggles lights.<br />
+        <strong>Tilt steer:</strong> tap <strong>Tilt steer</strong> (iOS may ask for motion access),
+        hold the phone level to set neutral, then tilt forward/back and left/right — see
+        <a href="https://developer.mozilla.org/en-US/docs/Web/API/Window/deviceorientation_event" style="color: var(--accent)">deviceorientation</a>.
+        Requires HTTPS (or localhost). Tap again to turn off.
       </p>
     </div>
     <script src="dist/app.js"></script>
